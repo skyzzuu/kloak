@@ -19,6 +19,7 @@
 #define MIN_KEYBOARD_KEYS 20  // need at least this many keys to be a keyboard
 #define POLL_TIMEOUT_MS 1 // timeout to check for new events
 #define DEFAULT_MAX_DELAY_MS 20  // upper bound on event delay
+#define DEFAULT_MAX_NOISE 0     // max number of pixels of adversarial noise added to mouse movements
 #define DEFAULT_STARTUP_DELAY_MS 500  // wait before grabbing the input device
 
 #define panic(format, ...) do { fprintf(stderr, format "\n", ## __VA_ARGS__); fflush(stderr); exit(EXIT_FAILURE); } while (0)
@@ -31,6 +32,8 @@
 #define max(a, b) ( ((a) > (b)) ? (a) : (b) )
 #endif
 
+#define mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y)
+
 static int interrupt = 0;  // flag to interrupt the main loop and exit
 static int verbose = 0;  // flag for verbose output
 
@@ -40,6 +43,7 @@ static int rescue_keys[MAX_RESCUE_KEYS];  // Codes of the rescue key combo
 static int rescue_len = 0;  // Number of rescue keys, set during initialization
 
 static int max_delay = DEFAULT_MAX_DELAY_MS;  // lag will never exceed this upper bound
+static int max_noise = DEFAULT_MAX_NOISE;
 static int startup_timeout = DEFAULT_STARTUP_DELAY_MS;
 
 static int device_count = 0;
@@ -237,6 +241,10 @@ void main_loop() {
         long random_delay = 0;
         struct input_event ev;
         struct entry *n1, *np;
+        
+        // only used on mouse moves
+        struct input_event ev2, ev3, ev4, ev5;
+        struct entry *n2 = NULL, *n3 = NULL, *n4 = NULL, *n5 = NULL;
 
         // initialize the rescue state
         int rescue_state[MAX_RESCUE_KEYS];
@@ -310,6 +318,90 @@ void main_loop() {
                                 } else {
                                         random_delay = random_between(lower_bound, max_delay);
                                 }
+                                
+                                if(mouse_move_with_obfuscation) {
+                                        if(ev.code == REL_X) {
+
+                                                // select a random midpoint to add the perpendicular move
+                                                int mid_point = random_between(1, abs(ev.value));
+
+                                                int final_move = abs(ev.value) - mid_point;
+
+                                                if(ev.value < 0) {
+                                                        mid_point *= -1;
+                                                        final_move *= -1;
+                                                }
+
+                                                int pixels_y = random_between(1, max_noise);
+
+                                                // randomly decide whether y move will be up or down
+                                                if(random_between(0, 1)) {
+                                                        pixels_y *= -1;
+                                                }
+
+
+                                                ev.type = EV_REL;
+                                                ev.code = REL_X;
+                                                ev.value = mid_point;
+
+                                                ev2.type = EV_REL;
+                                                ev2.code = REL_Y;
+                                                ev2.value = pixels_y;
+
+                                                ev3.type = EV_SYN;
+                                                ev3.code = 0;
+                                                ev3.value = 0;
+
+                                                ev4.type = EV_REL;
+                                                ev4.code = REL_Y;
+                                                ev4.value = pixels_y * -1;
+
+                                                ev5.type = EV_REL;
+                                                ev5.code = REL_X;
+                                                ev5.value = final_move;
+                                                        
+                                        } else if(ev.code == REL_Y) {
+                                                // select a random midpoint to add the perpendicular move
+                                                int mid_point = random_between(1, abs(ev.value));
+
+                                                int final_move = abs(ev.value) - mid_point;
+
+                                                if(ev.value < 0) {
+                                                        mid_point *= -1;
+                                                        final_move *= -1;
+                                                }
+
+                                                int pixels_x = random_between(1, max_noise);
+
+                                                // randomly decide whether x move will be left or right
+                                                if(random_between(0, 1)) {
+                                                        pixels_x *= -1;
+                                                }
+
+
+
+                                                ev.type = EV_REL;
+                                                ev.code = REL_Y;
+                                                ev.value = mid_point;
+
+                                                ev2.type = EV_REL;
+                                                ev2.code = REL_X;
+                                                ev2.value = pixels_x;
+
+                                                ev3.type = EV_SYN;
+                                                ev3.code = 0;
+                                                ev3.value = 0;
+
+                                                ev4.type = EV_REL;
+                                                ev4.code = REL_X;
+                                                ev4.value = pixels_x * -1;
+
+                                                ev5.type = EV_REL;
+                                                ev5.code = REL_Y;
+                                                ev5.value = final_move;
+                                        }
+                                }
+
 
                                 // Buffer the event
                                 n1 = malloc(sizeof(struct entry));
@@ -323,6 +415,11 @@ void main_loop() {
 
                                 // Keep track of the previous scheduled release time
                                 prev_release_time = n1->time;
+                                
+                                // on mouse moves
+                                if(mouse_move_with_obfuscation) {
+                                        prev_release_time = n5->time;
+                                }
 
                                 if (verbose) {
                                         printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
@@ -347,6 +444,7 @@ void usage() {
         fprintf(stderr, "  -k csv_string: csv list of rescue key names to exit kloak in case the\n"
                 "     keyboard becomes unresponsive. Default is 'KEY_LEFTSHIFT,KEY_RIGHTSHIFT,KEY_ESC'.\n");
         fprintf(stderr, "  -v: verbose mode\n");
+        fprintf(stderr, "  -n: max noise added to mouse movements in pixels. Default %d, can fully disable by setting to 0\n", max_noise);
 }
 
 void banner() {
@@ -411,6 +509,10 @@ int main(int argc, char **argv) {
                 case 'h':
                         usage();
                         exit(0);
+                        break;
+                case 'n':
+                        if((max_noise = atoi(optarg)) < 0)
+                                panic("Maximum noise must be >= 0");
                         break;
 
                 default:
