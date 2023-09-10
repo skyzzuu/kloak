@@ -1,0 +1,9 @@
+SUBSYSTEM!="input", GOTO="end"
+
+# new keyboard or mouse attached, run systemctl start kloak@event[0-9].service
+KERNEL=="event*", ACTION=="add", RUN+="/usr/bin/systemctl start kloak@%k.service"
+
+# keyboard or mouse removed, run systemctl stop kloak@event[0-9].service
+KERNEL=="event*", ACTION=="remove", RUN+="/usr/bin/systemctl stop kloak@%k.service"
+
+LABEL="end"
