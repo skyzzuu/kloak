@@ -185,6 +185,12 @@ void init_inputs() {
         for (int i = 0; i < device_count; i++) {
                 if ((fd = open(named_inputs[i], O_RDONLY)) < 0)
                         panic("Could not open: %s", named_inputs[i]);
+                
+                // if -r parameter was passed, make sure it's actually a keyboard or mouse before proceeding (technically can equal 1 if detect_devices only finds 1 device as well, but if you've reached this point in that case, its already passed either is_keyboard or is_mouse and will proceed)
+                if(device_count == 1 && !(is_keyboard(fd) || is_mouse(fd))) {
+                        close(fd);
+                        panic("device file %s specified with -r option is not a keyboard or mouse", named_inputs[i]);
+                }
 
                 // set the device to nonblocking mode
                 if (ioctl(fd, FIONBIO, &one) < 0)
