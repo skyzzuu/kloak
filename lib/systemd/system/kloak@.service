@@ -7,6 +7,7 @@ Documentation=https://github.com/vmonaco/kloak
 ConditionPathExists=!/run/qubes/this-is-templatevm
 Before=graphical.target
 Before=getty.target
+JoinsNamespaceOf=kloak@.service
 
 [Service]
 Type=simple
@@ -56,7 +57,7 @@ RestrictRealtime=true
 RestrictNamespaces=true
 SystemCallArchitectures=native
 SystemCallFilter=ioctl nanosleep select write read openat close brk fstat lseek mmap mprotect munmap rt_sigaction rt_sigprocmask access execve getuid arch_prctl set_tid_address set_robust_list prlimit64 pread64 getrandom newfstatat clock_nanosleep pselect6 poll shmctl openat getdents64
-JoinsNamespaceOf=kloak@.service
+
 
 [Install]
 WantedBy=multi-user.target
