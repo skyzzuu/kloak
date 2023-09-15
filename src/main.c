@@ -63,6 +63,7 @@ static struct option long_options[] = {
         {"keys",    1, 0, 'k'},
         {"verbose", 0, 0, 'v'},
         {"help",    0, 0, 'h'},
+        {"noise",    1, 0, 'n'},
         {0,         0, 0, 0}
 };
 
