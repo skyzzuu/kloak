@@ -612,7 +612,7 @@ int main(int argc, char **argv) {
                 printf("You are not root! This may not work...\n");
 
         while (1) {
-                int c = getopt_long(argc, argv, "r:d:s:k:vh", long_options, NULL);
+                int c = getopt_long(argc, argv, "r:d:s:k:n:vh", long_options, NULL);
 
                 if (c < 0)
                         break;
