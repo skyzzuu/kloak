@@ -449,9 +449,14 @@ void main_loop() {
                                                         ev.value = noise(ev.value);
                                                         
                                                         // modified ABS_Y based on last known position
-                                                        ev2.type = EV_ABS;
-                                                        ev2.code = ABS_Y;
-                                                        ev2.value = noise(abs_last_y);
+                                                        // ev2.type = EV_ABS;
+                                                        // ev2.code = ABS_Y;
+                                                        // ev2.value = noise(abs_last_y);
+                                                        
+                                                        ev2.type = EV_SYN;
+                                                        ev2.code = 0;
+                                                        ev2.value = 0;
+                                                        
                                                         
                                                         ev3.type = EV_SYN;
                                                         ev3.code = 0;
@@ -480,9 +485,13 @@ void main_loop() {
                                                         ev.value = noise(ev.value);
                                                         
                                                         // modified ABS_X based on last known position
-                                                        ev2.type = EV_ABS;
-                                                        ev2.code = ABS_X;
-                                                        ev2.value = noise(abs_last_x);
+                                                        // ev2.type = EV_ABS;
+                                                        // ev2.code = ABS_X;
+                                                        // ev2.value = noise(abs_last_x);
+                                                        
+                                                        ev2.type = EV_SYN;
+                                                        ev2.code = 0;
+                                                        ev2.value = 0;
                                                         
                                                         ev3.type = EV_SYN;
                                                         ev3.code = 0;
