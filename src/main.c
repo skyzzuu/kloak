@@ -270,8 +270,8 @@ void main_loop() {
         struct entry *n1, *np;
         
         // only used on mouse moves
-        struct input_event ev2, ev3, ev4, ev5;
-        struct entry *n2 = NULL, *n3 = NULL, *n4 = NULL, *n5 = NULL;
+        struct input_event ev2, ev3, ev4, ev5, ev6;
+        struct entry *n2 = NULL, *n3 = NULL, *n4 = NULL, *n5 = NULL, *n6 = NULL;
 
         // initialize the rescue state
         int rescue_state[MAX_RESCUE_KEYS];
@@ -386,6 +386,10 @@ void main_loop() {
                                                 ev5.type = EV_REL;
                                                 ev5.code = REL_X;
                                                 ev5.value = final_move;
+                                                
+                                                ev6.type = EV_SYN;
+                                                ev6.code = 0;
+                                                ev6.value = 0;
                                                         
                                         } else if(ev.code == REL_Y) {
                                                 // select a random midpoint to add the perpendicular move
@@ -426,6 +430,10 @@ void main_loop() {
                                                 ev5.type = EV_REL;
                                                 ev5.code = REL_Y;
                                                 ev5.value = final_move;
+                                                
+                                                ev6.type = EV_SYN;
+                                                ev6.code = 0;
+                                                ev6.value = 0;
                                         }
                                 }
                                 
@@ -472,6 +480,10 @@ void main_loop() {
                                                         ev5.code = ABS_Y;
                                                         ev5.value = abs_last_y;
                                                         
+                                                        ev6.type = EV_SYN;
+                                                        ev6.code = 0;
+                                                        ev6.value = 0;
+                                                        
                                                         abs_last_x = origPos;
                                                                 
 
@@ -506,6 +518,10 @@ void main_loop() {
                                                         ev5.type = EV_ABS;
                                                         ev5.code = ABS_X;
                                                         ev5.value = abs_last_x;
+                                                        
+                                                        ev6.type = EV_SYN;
+                                                        ev6.code = 0;
+                                                        ev6.value = 0;
                                                         
                                                         abs_last_y = origPos;
                                                 }   
@@ -559,11 +575,18 @@ void main_loop() {
                                         n5->iev = ev5;
                                         n5->device_index = k;
                                         TAILQ_INSERT_TAIL(&head, n5, entries);
+                                        
+                                        random_delay = random_between(lower_bound, max_delay);
+                                        n6 = malloc(sizeof(struct entry));
+                                        n6->time = current_time + (long) random_delay;
+                                        n6->iev = ev6;
+                                        n6->device_index = k;
+                                        TAILQ_INSERT_TAIL(&head, n6, entries);
                                 }
                                 
                                 // on mouse moves
                                 if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && abs_last_x != 0 && abs_last_y != 0) ) {
-                                        prev_release_time = n5->time;
+                                        prev_release_time = n6->time;
                                 }
 
                                 if (verbose) {
