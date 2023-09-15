@@ -9,6 +9,7 @@
 #include <sys/queue.h>
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>
+#include <math.h>
 
 #include "keycodes.h"
 
@@ -21,6 +22,7 @@
 #define DEFAULT_MAX_DELAY_MS 20  // upper bound on event delay
 #define DEFAULT_MAX_NOISE 0     // max number of pixels of adversarial noise added to mouse movements
 #define DEFAULT_STARTUP_DELAY_MS 500  // wait before grabbing the input device
+#define _2PI 6.283185307
 
 #define panic(format, ...) do { fprintf(stderr, format "\n", ## __VA_ARGS__); fflush(stderr); exit(EXIT_FAILURE); } while (0)
 
@@ -32,7 +34,8 @@
 #define max(a, b) ( ((a) > (b)) ? (a) : (b) )
 #endif
 
-#define mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y)
+#define rel_mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y)
+#define abs_mouse_move_with_obfuscation ev.type == EV_ABS && max_noise != 0 && ev.value != 0 && (ev.code == ABS_X || ev.code == ABS_Y)
 
 static int interrupt = 0;  // flag to interrupt the main loop and exit
 static int verbose = 0;  // flag for verbose output
@@ -92,6 +95,27 @@ long random_between(long lower, long upper) {
 
         return lower + randombytes_uniform(upper - lower + 1);
 }
+
+
+
+// from: https://github.com/luileito/mousefaker/blob/main/src/js/mousefaker.js
+int noise(int position) {
+        // generate a random number between 0 and 1 for u1 and u2
+        double u1 = (float)randombytes_uniform(999999)/(float)(RAND_MAX/1);
+        double u2 = (float)randombytes_uniform(999999)/(float)(RAND_MAX/1);
+        
+        double z0 = sqrt(-2.0 * log(u1)) * cos(_2PI * u2);
+        
+        int newPos = position + (z0 * max_noise);
+        
+        if (newPos < 0) {
+                newPos = 0;
+        }
+        
+        return newPos;
+        
+}
+
 
 void set_rescue_keys(const char* rescue_keys_str) {
         char* _rescue_keys_str = malloc(strlen(rescue_keys_str) + 1);
@@ -239,6 +263,8 @@ void main_loop() {
         long current_time = 0;
         long lower_bound = 0;
         long random_delay = 0;
+        uint32_t abs_last_x = 0;
+        uint32_t abs_last_y = 0;
         struct input_event ev;
         struct entry *n1, *np;
         
@@ -319,7 +345,7 @@ void main_loop() {
                                         random_delay = random_between(lower_bound, max_delay);
                                 }
                                 
-                                if(mouse_move_with_obfuscation) {
+                                if(rel_mouse_move_with_obfuscation) {
                                         if(ev.code == REL_X) {
 
                                                 // select a random midpoint to add the perpendicular move
@@ -401,6 +427,82 @@ void main_loop() {
                                                 ev5.value = final_move;
                                         }
                                 }
+                                
+                                
+                                if(abs_mouse_move_with_obfuscation) {
+                                        
+                                        // either last known x or y position is not known yet, needed before obfuscation can be added
+                                        if(abs_last_x == 0 || abs_last_y == 0) {
+                                                if(ev.code == ABS_X) {
+                                                        abs_last_x = ev.value;
+                                                } else if(ev.code == ABS_Y) {
+                                                        abs_last_y = ev.value;
+                                                }
+                                        } else {
+                                                if(ev.code == ABS_X) {
+                                                        uint32_t origPos = ev.value; 
+                                                        
+                                                        // modified ABS_X
+                                                        ev.type = EV_ABS;
+                                                        ev.code = ABS_X;
+                                                        ev.value = noise(ev.value);
+                                                        
+                                                        // modified ABS_Y based on last known position
+                                                        ev2.type = EV_ABS;
+                                                        ev2.code = ABS_Y;
+                                                        ev2.value = noise(abs_last_y);
+                                                        
+                                                        ev3.type = EV_SYN;
+                                                        ev3.code = 0;
+                                                        ev3.value = 0;
+                                                        
+                                                        // move to the target x position
+                                                        ev4.type = EV_ABS;
+                                                        ev4.code = ABS_X;
+                                                        ev4.value = origPos;
+                                                        
+                                                        // move back to the original y position
+                                                        ev5.type = EV_ABS;
+                                                        ev5.code = ABS_Y;
+                                                        ev5.value = abs_last_y;
+                                                        
+                                                        abs_last_x = origPos;
+                                                                
+
+                                                        
+                                                } else if(ev.code == ABS_Y) {
+                                                        uint32_t origPos = ev.value; 
+                                                        
+                                                        // modified ABS_Y
+                                                        ev.type = EV_ABS;
+                                                        ev.code = ABS_Y;
+                                                        ev.value = noise(ev.value);
+                                                        
+                                                        // modified ABS_X based on last known position
+                                                        ev2.type = EV_ABS;
+                                                        ev2.code = ABS_X;
+                                                        ev2.value = noise(abs_last_x);
+                                                        
+                                                        ev3.type = EV_SYN;
+                                                        ev3.code = 0;
+                                                        ev3.value = 0;
+                                                        
+                                                        // move to the target x position
+                                                        ev4.type = EV_ABS;
+                                                        ev4.code = ABS_Y;
+                                                        ev4.value = origPos;
+                                                        
+                                                        // move back to the original y position
+                                                        ev5.type = EV_ABS;
+                                                        ev5.code = ABS_X;
+                                                        ev5.value = abs_last_x;
+                                                        
+                                                        abs_last_y = origPos;
+                                                }   
+                                        }
+                                        
+                                        
+                                }
 
 
                                 // Buffer the event
@@ -416,8 +518,41 @@ void main_loop() {
                                 // Keep track of the previous scheduled release time
                                 prev_release_time = n1->time;
                                 
+                                
+                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation && abs_last_x != 0 && abs_last_y != 0) ) {
+                                        // if the times these are given are actually incremental (n2 = n1 + rand, n3 = n2 + rand, etc) it seems to break the cursor movement obfuscation for some reason
+                                        long random_delay = random_between(lower_bound, max_delay);
+                                        n2 = malloc(sizeof(struct entry));
+
+                                        n2->time = current_time + (long) random_delay;
+                                        n2->iev = ev2;
+                                        n2->device_index = k;
+                                        TAILQ_INSERT_TAIL(&head, n2, entries);
+
+                                        random_delay = random_between(lower_bound, max_delay);
+                                        n3 = malloc(sizeof(struct entry));
+                                        n3->time = current_time + (long) random_delay;
+                                        n3->iev = ev3;
+                                        n3->device_index = k;
+                                        TAILQ_INSERT_TAIL(&head, n3, entries);
+
+                                        random_delay = random_between(lower_bound, max_delay);
+                                        n4 = malloc(sizeof(struct entry));
+                                        n4->time = current_time + (long) random_delay;
+                                        n4->iev = ev4;
+                                        n4->device_index = k;
+                                        TAILQ_INSERT_TAIL(&head, n4, entries);
+
+                                        random_delay = random_between(lower_bound, max_delay);
+                                        n5 = malloc(sizeof(struct entry));
+                                        n5->time = current_time + (long) random_delay;
+                                        n5->iev = ev5;
+                                        n5->device_index = k;
+                                        TAILQ_INSERT_TAIL(&head, n5, entries);
+                                }
+                                
                                 // on mouse moves
-                                if(mouse_move_with_obfuscation) {
+                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && abs_last_x != 0 && abs_last_y != 0) ) {
                                         prev_release_time = n5->time;
                                 }
 
