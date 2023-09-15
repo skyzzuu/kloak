@@ -74,6 +74,7 @@ struct entry {
         long time;
         TAILQ_ENTRY(entry) entries;
         int device_index;
+        uint64_t id;
 };
 
 void sleep_ms(long milliseconds) {
@@ -256,6 +257,7 @@ void emit_event(struct entry *e) {
                        "Code: %*d,  Value: %*d,  Missed target:  %*d ms \n",
                        e->time, e->device_index, 3, e->iev.type, 5, e->iev.code, 5, e->iev.value, 5, delay);
         }
+        
 }
 
 void main_loop() {
@@ -300,6 +302,9 @@ void main_loop() {
                 // Emit any events exceeding the current time
                 current_time = current_time_ms();
                 while ((np = TAILQ_FIRST(&head)) && (current_time >= np->time)) {
+                        if(verbose) {
+                                printf("Emitting event %lu\n", np->id);
+                        }
                         emit_event(np);
                         TAILQ_REMOVE(&head, np, entries);
                         free(np);
@@ -539,6 +544,7 @@ void main_loop() {
                                 n1->time = current_time + random_delay;
                                 n1->iev = ev;
                                 n1->device_index = k;
+                                n1->id = random_between(1, UINT64_MAX);
                                 TAILQ_INSERT_TAIL(&head, n1, entries);
 
                                 // Keep track of the previous scheduled release time
@@ -553,6 +559,7 @@ void main_loop() {
                                         n2->time = current_time + (long) random_delay;
                                         n2->iev = ev2;
                                         n2->device_index = k;
+                                        n2->id = random_between(1, UINT64_MAX);
                                         TAILQ_INSERT_TAIL(&head, n2, entries);
 
                                         random_delay = random_between(lower_bound, max_delay);
@@ -560,6 +567,7 @@ void main_loop() {
                                         n3->time = current_time + (long) random_delay;
                                         n3->iev = ev3;
                                         n3->device_index = k;
+                                        n3->id = random_between(1, UINT64_MAX);
                                         TAILQ_INSERT_TAIL(&head, n3, entries);
 
                                         random_delay = random_between(lower_bound, max_delay);
@@ -567,6 +575,7 @@ void main_loop() {
                                         n4->time = current_time + (long) random_delay;
                                         n4->iev = ev4;
                                         n4->device_index = k;
+                                        n4->id = random_between(1, UINT64_MAX);
                                         TAILQ_INSERT_TAIL(&head, n4, entries);
 
                                         random_delay = random_between(lower_bound, max_delay);
@@ -574,6 +583,7 @@ void main_loop() {
                                         n5->time = current_time + (long) random_delay;
                                         n5->iev = ev5;
                                         n5->device_index = k;
+                                        n5->id = random_between(1, UINT64_MAX);
                                         TAILQ_INSERT_TAIL(&head, n5, entries);
                                         
                                         random_delay = random_between(lower_bound, max_delay);
@@ -581,6 +591,7 @@ void main_loop() {
                                         n6->time = current_time + (long) random_delay;
                                         n6->iev = ev6;
                                         n6->device_index = k;
+                                        n5->id = random_between(1, UINT64_MAX);
                                         TAILQ_INSERT_TAIL(&head, n6, entries);
                                 }
                                 
@@ -591,32 +602,32 @@ void main_loop() {
 
                                 if (verbose) {
                                         printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n1->time, k, 3, n1->iev.type, 5, n1->iev.code, 5, n1->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n1->time, k, 3, n1->iev.type, 5, n1->iev.code, 5, n1->iev.value, n1->id,
                                                4, random_delay);
                                         if (lower_bound > 0) {
                                                 printf("Lower bound raised to: %*ld ms\n", 4, lower_bound);
                                         }
                                         if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && abs_last_x != 0 && abs_last_y != 0)) {
                                                 printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value, n2->id,
                                                4, random_delay);
                                                 printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n3->time, k, 3, n3->iev.type, 5, n3->iev.code, 5, n3->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n3->time, k, 3, n3->iev.type, 5, n3->iev.code, 5, n3->iev.value, n3->id,
                                                4, random_delay);
                                                 printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n4->time, k, 3, n4->iev.type, 5, n4->iev.code, 5, n4->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n4->time, k, 3, n4->iev.type, 5, n4->iev.code, 5, n4->iev.value, n4->id,
                                                4, random_delay);
                                                 printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n5->time, k, 3, n5->iev.type, 5, n5->iev.code, 5, n5->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n5->time, k, 3, n5->iev.type, 5, n5->iev.code, 5, n5->iev.value, n5->id,
                                                4, random_delay);
                                                 printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                               n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value,
+                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                               n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value, n6->id,
                                                4, random_delay);
                                                 
                                         }
