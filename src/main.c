@@ -74,7 +74,7 @@ struct entry {
         long time;
         TAILQ_ENTRY(entry) entries;
         int device_index;
-        uint64_t id;
+        long int id;
 };
 
 void sleep_ms(long milliseconds) {
@@ -262,6 +262,8 @@ void emit_event(struct entry *e) {
 
 void main_loop() {
         int err;
+        long int id = 0;
+        int can_obfuscate = 0;
         long prev_release_time = 0;
         long current_time = 0;
         long lower_bound = 0;
@@ -299,11 +301,12 @@ void main_loop() {
         // so that events are always scheduled in the order they
         // arrive (FIFO).
         while (!interrupt) {
+                can_obfuscate = 0;
                 // Emit any events exceeding the current time
                 current_time = current_time_ms();
                 while ((np = TAILQ_FIRST(&head)) && (current_time >= np->time)) {
                         if(verbose) {
-                                printf("Emitting event %lu\n", np->id);
+                                printf("Emitting event %ld\n", np->id);
                         }
                         emit_event(np);
                         TAILQ_REMOVE(&head, np, entries);
@@ -452,6 +455,10 @@ void main_loop() {
                                                 } else if(ev.code == ABS_Y) {
                                                         abs_last_y = ev.value;
                                                 }
+                                                
+                                                can_obfuscate = 0;
+                                                
+                                                
                                         } else {
                                                 if(ev.code == ABS_X) {
                                                         uint32_t origPos = ev.value; 
@@ -462,13 +469,9 @@ void main_loop() {
                                                         ev.value = noise(ev.value);
                                                         
                                                         // modified ABS_Y based on last known position
-                                                        // ev2.type = EV_ABS;
-                                                        // ev2.code = ABS_Y;
-                                                        // ev2.value = noise(abs_last_y);
-                                                        
-                                                        ev2.type = EV_SYN;
-                                                        ev2.code = 0;
-                                                        ev2.value = 0;
+                                                        ev2.type = EV_ABS;
+                                                        ev2.code = ABS_Y;
+                                                        ev2.value = noise(abs_last_y);
                                                         
                                                         
                                                         ev3.type = EV_SYN;
@@ -502,13 +505,9 @@ void main_loop() {
                                                         ev.value = noise(ev.value);
                                                         
                                                         // modified ABS_X based on last known position
-                                                        // ev2.type = EV_ABS;
-                                                        // ev2.code = ABS_X;
-                                                        // ev2.value = noise(abs_last_x);
-                                                        
-                                                        ev2.type = EV_SYN;
-                                                        ev2.code = 0;
-                                                        ev2.value = 0;
+                                                        ev2.type = EV_ABS;
+                                                        ev2.code = ABS_X;
+                                                        ev2.value = noise(abs_last_x);
                                                         
                                                         ev3.type = EV_SYN;
                                                         ev3.code = 0;
@@ -529,7 +528,10 @@ void main_loop() {
                                                         ev6.value = 0;
                                                         
                                                         abs_last_y = origPos;
-                                                }   
+                                                }
+                                                
+                                                
+                                                can_obfuscate = 1;
                                         }
                                         
                                         
@@ -544,14 +546,20 @@ void main_loop() {
                                 n1->time = current_time + random_delay;
                                 n1->iev = ev;
                                 n1->device_index = k;
-                                n1->id = random_between(1, UINT64_MAX);
+                                if(id < LONG_MAX-1) {
+                                        n1->id = id++;
+                                } else {
+                                        id = 0;
+                                        n1->id = id++;
+                                }
+                                
                                 TAILQ_INSERT_TAIL(&head, n1, entries);
 
                                 // Keep track of the previous scheduled release time
                                 prev_release_time = n1->time;
                                 
                                 
-                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation && abs_last_x != 0 && abs_last_y != 0) ) {
+                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation && can_obfuscate) ) {
                                         // if the times these are given are actually incremental (n2 = n1 + rand, n3 = n2 + rand, etc) it seems to break the cursor movement obfuscation for some reason
                                         long random_delay = random_between(lower_bound, max_delay);
                                         n2 = malloc(sizeof(struct entry));
@@ -559,15 +567,28 @@ void main_loop() {
                                         n2->time = current_time + (long) random_delay;
                                         n2->iev = ev2;
                                         n2->device_index = k;
-                                        n2->id = random_between(1, UINT64_MAX);
+                                        if(id < LONG_MAX-1) {
+                                                n2->id = id++;
+                                        } else {
+                                                id = 0;
+                                                n2->id = id++;
+                                        }
                                         TAILQ_INSERT_TAIL(&head, n2, entries);
+                                        
+
+                                        
 
                                         random_delay = random_between(lower_bound, max_delay);
                                         n3 = malloc(sizeof(struct entry));
                                         n3->time = current_time + (long) random_delay;
                                         n3->iev = ev3;
                                         n3->device_index = k;
-                                        n3->id = random_between(1, UINT64_MAX);
+                                        if(id < LONG_MAX-1) {
+                                                n3->id = id++;
+                                        } else {
+                                                id = 0;
+                                                n3->id = id++;
+                                        }
                                         TAILQ_INSERT_TAIL(&head, n3, entries);
 
                                         random_delay = random_between(lower_bound, max_delay);
@@ -575,7 +596,12 @@ void main_loop() {
                                         n4->time = current_time + (long) random_delay;
                                         n4->iev = ev4;
                                         n4->device_index = k;
-                                        n4->id = random_between(1, UINT64_MAX);
+                                        if(id < LONG_MAX-1) {
+                                                n4->id = id++;
+                                        } else {
+                                                id = 0;
+                                                n4->id = id++;
+                                        }
                                         TAILQ_INSERT_TAIL(&head, n4, entries);
 
                                         random_delay = random_between(lower_bound, max_delay);
@@ -583,7 +609,12 @@ void main_loop() {
                                         n5->time = current_time + (long) random_delay;
                                         n5->iev = ev5;
                                         n5->device_index = k;
-                                        n5->id = random_between(1, UINT64_MAX);
+                                        if(id < LONG_MAX-1) {
+                                                n5->id = id++;
+                                        } else {
+                                                id = 0;
+                                                n5->id = id++;
+                                        }
                                         TAILQ_INSERT_TAIL(&head, n5, entries);
                                         
                                         random_delay = random_between(lower_bound, max_delay);
@@ -591,42 +622,48 @@ void main_loop() {
                                         n6->time = current_time + (long) random_delay;
                                         n6->iev = ev6;
                                         n6->device_index = k;
-                                        n5->id = random_between(1, UINT64_MAX);
+                                        if(id < LONG_MAX-1) {
+                                                n6->id = id++;
+                                        } else {
+                                                id = 0;
+                                                n6->id = id++;
+                                        }
                                         TAILQ_INSERT_TAIL(&head, n6, entries);
                                 }
                                 
                                 // on mouse moves
-                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && abs_last_x != 0 && abs_last_y != 0) ) {
+                                if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate) ) {
                                         prev_release_time = n6->time;
                                 }
 
                                 if (verbose) {
-                                        printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                        printf("Buffered n1 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n1->time, k, 3, n1->iev.type, 5, n1->iev.code, 5, n1->iev.value, n1->id,
                                                4, random_delay);
                                         if (lower_bound > 0) {
                                                 printf("Lower bound raised to: %*ld ms\n", 4, lower_bound);
                                         }
-                                        if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && abs_last_x != 0 && abs_last_y != 0)) {
-                                                printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                        if(((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate)) && n2 && n3 && n4 && n5 && n6 ) {
+                                                printf("Buffered n2 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value, n2->id,
                                                4, random_delay);
-                                                printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                                printf("n2 type %d\n", n2->iev.type);
+                                                printf("Buffered n3 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n3->time, k, 3, n3->iev.type, 5, n3->iev.code, 5, n3->iev.value, n3->id,
                                                4, random_delay);
-                                                printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                                printf("Buffered n4 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n4->time, k, 3, n4->iev.type, 5, n4->iev.code, 5, n4->iev.value, n4->id,
                                                4, random_delay);
-                                                printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                                printf("Buffered n5 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n5->time, k, 3, n5->iev.type, 5, n5->iev.code, 5, n5->iev.value, n5->id,
                                                4, random_delay);
-                                                printf("Buffered event at time: %ld. Device: %d,  Type: %*d,  "
-                                               "Code: %*d,  Value: %*d, id: %lu,  Scheduled delay: %*ld ms \n",
+                                                printf("Buffered n6 event at time: %ld. Device: %d,  Type: %*d,  "
+                                               "Code: %*d,  Value: %*d, id: %ld,  Scheduled delay: %*ld ms \n",
                                                n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value, n6->id,
                                                4, random_delay);
                                                 
