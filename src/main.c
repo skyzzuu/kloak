@@ -605,7 +605,6 @@ void main_loop() {
                 
                             
                 if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation && can_obfuscate) ) {
-                        // if the times these are given are actually incremental (n2 = n1 + rand, n3 = n2 + rand, etc) it seems to break the cursor movement obfuscation for some reason
                         long random_delay = random_between(lower_bound, max_delay);
                         n2 = malloc(sizeof(struct entry));
                         n3 = malloc(sizeof(struct entry));
@@ -618,7 +617,7 @@ void main_loop() {
                         }
                         
 
-                        n2->time = current_time + (long) random_delay;
+                        n2->time = n1->time + (long) random_delay;
                         n2->iev = ev2;
                         n2->device_index = k;
                         if(id < LONG_MAX-1) {
@@ -634,7 +633,7 @@ void main_loop() {
 
                         random_delay = random_between(lower_bound, max_delay);
                         
-                        n3->time = current_time + (long) random_delay;
+                        n3->time = n2->time + (long) random_delay;
                         n3->iev = ev3;
                         n3->device_index = k;
                         if(id < LONG_MAX-1) {
@@ -647,7 +646,7 @@ void main_loop() {
 
                         random_delay = random_between(lower_bound, max_delay);
                         
-                        n4->time = current_time + (long) random_delay;
+                        n4->time = n3->time + (long) random_delay;
                         n4->iev = ev4;
                         n4->device_index = k;
                         if(id < LONG_MAX-1) {
@@ -660,7 +659,7 @@ void main_loop() {
 
                         random_delay = random_between(lower_bound, max_delay);
                         
-                        n5->time = current_time + (long) random_delay;
+                        n5->time = n4->time + (long) random_delay;
                         n5->iev = ev5;
                         n5->device_index = k;
                         if(id < LONG_MAX-1) {
@@ -673,7 +672,7 @@ void main_loop() {
                         
                         random_delay = random_between(lower_bound, max_delay);
                         
-                        n6->time = current_time + (long) random_delay;
+                        n6->time = n5->time + (long) random_delay;
                         n6->iev = ev6;
                         n6->device_index = k;
                         if(id < LONG_MAX-1) {
