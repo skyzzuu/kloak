@@ -25,7 +25,7 @@
 #define DEFAULT_STARTUP_DELAY_MS 500 // wait before grabbing the input device
 #define _2PI 6.283185307
 #define rel_mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y)
-#define abs_mouse_move_with_obfuscation ev.type == EV_ABS && max_noise != 0 && ev.value != 0 && (ev.code == ABS_X || ev.code == ABS_Y)
+#define abs_mouse_move_with_obfuscation ev.type == EV_ABS && max_noise != 0 && ev.value != 0 && (ev.code == ABS_X || ev.code == ABS_Y) && x_axis_maxs[k] != 0 && y_axis_maxs[k] != 0
 
 #define panic(format, ...) do { fprintf(stderr, format "\n", ## __VA_ARGS__); fflush(stderr); exit(EXIT_FAILURE); } while (0)
 
@@ -56,6 +56,10 @@ static char named_inputs[MAX_INPUTS][BUFSIZE];
 
 static int input_fds[MAX_INPUTS];
 struct libevdev *output_devs[MAX_INPUTS];
+int x_axis_maxs[MAX_INPUTS] = {0};
+int y_axis_maxs[MAX_INPUTS] = {0};
+int x_axis_mins[MAX_INPUTS] = {0};
+int y_axis_mins[MAX_INPUTS] = {0};
 struct libevdev_uinput *uidevs[MAX_INPUTS];
 
 static struct option long_options[] = {
@@ -236,6 +240,22 @@ void init_outputs() {
 
         if (err != 0)
             panic("Could not create evdev for input device: %s", named_inputs[i]);
+        
+        if(supports_event_type(input_fds[i], EV_ABS)) {
+            // get_abs_max will return 0 on failure, instead of exiting, main_loop will just not add mouse movement obfuscation if device reports that axis is not valid
+            int abs_x_max = libevdev_get_abs_maximum(output_devs[i], ABS_X);
+            x_axis_maxs[i] = abs_x_max;
+            
+            int abs_y_max = libevdev_get_abs_maximum(output_devs[i], ABS_Y);
+            y_axis_maxs[i] = abs_y_max;
+            
+            int abs_x_min = libevdev_get_abs_minimum(output_devs[i], ABS_X);
+            x_axis_mins[i] = abs_x_min;
+            
+            int abs_y_min = libevdev_get_abs_minimum(output_devs[i], ABS_Y);
+            y_axis_mins[i] = abs_y_min;
+            
+        }
 
         err = libevdev_uinput_create_from_device(output_devs[i], LIBEVDEV_UINPUT_OPEN_MANAGED, &uidevs[i]);
 
@@ -467,12 +487,24 @@ void main_loop() {
                             // modified ABS_X
                             ev.type = EV_ABS;
                             ev.code = ABS_X;
-                            ev.value = noise(ev.value);
+                            int newPos = noise(ev.value);
+                            if(newPos > x_axis_maxs[k]) {
+                                newPos = x_axis_maxs[k];
+                            } else if(newPos < x_axis_mins[k]) {
+                                newPos = x_axis_mins[k];
+                            }
+                            ev.value = newPos;
                                         
                             // modified ABS_Y based on last known position
                             ev2.type = EV_ABS;
                             ev2.code = ABS_Y;
-                            ev2.value = noise(abs_last_y);
+                            newPos = noise(abs_last_y);
+                            if(newPos > y_axis_maxs[k]) {
+                                newPos = y_axis_maxs[k];
+                            } else if(newPos < y_axis_mins[k]) {
+                                newPos = y_axis_mins[k];
+                            }
+                            ev2.value = newPos;
                         
                         
                             ev3.type = EV_SYN;
@@ -503,12 +535,24 @@ void main_loop() {
                             // modified ABS_Y
                             ev.type = EV_ABS;
                             ev.code = ABS_Y;
-                            ev.value = noise(ev.value);
+                            int newPos = noise(ev.value);
+                            if(newPos > y_axis_maxs[k]) {
+                                newPos = y_axis_maxs[k];
+                            } else if(newPos < y_axis_mins[k]) {
+                                newPos = y_axis_mins[k];
+                            }
+                            ev.value = newPos;
                         
                             // modified ABS_X based on last known position
                             ev2.type = EV_ABS;
                             ev2.code = ABS_X;
-                            ev2.value = noise(abs_last_x);
+                            newPos = noise(abs_last_x);
+                            if(newPos > x_axis_maxs[k]) {
+                                newPos = x_axis_maxs[k];
+                            } else if(newPos < x_axis_mins[k]) {
+                                newPos = x_axis_mins[k];
+                            }
+                            ev2.value = newPos;
                         
                             ev3.type = EV_SYN;
                             ev3.code = 0;
