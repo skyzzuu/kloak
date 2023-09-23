@@ -655,7 +655,7 @@ void main_loop() {
                 if (verbose) {
                         printf("Buffered n1 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                n1->time, k, 3, n1->iev.type, 5, n1->iev.code, 5, n1->iev.value,
+                                n1->time, k, 3, n1->iev.type, 5, n1->iev.code, 5, n1->iev.value, 4,
                                 random_delay);
                         if (lower_bound > 0) {
                                 printf("Lower bound raised to: %*ld ms\n", 4, lower_bound);
@@ -663,23 +663,23 @@ void main_loop() {
                         if(((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate)) && n2 && n3 && n4 && n5 && n6 ) {
                                 printf("Buffered n2 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value,
+                                n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value, 4,
                                 random_delay);
                                 printf("Buffered n3 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                n3->time, k, 3, n3->iev.type, 5, n3->iev.code, 5, n3->iev.value,
+                                n3->time, k, 3, n3->iev.type, 5, n3->iev.code, 5, n3->iev.value, 4,
                                 random_delay);
                                 printf("Buffered n4 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d, Scheduled delay: %*ld ms \n",
-                                n4->time, k, 3, n4->iev.type, 5, n4->iev.code, 5, n4->iev.value,
+                                n4->time, k, 3, n4->iev.type, 5, n4->iev.code, 5, n4->iev.value, 4,
                                 random_delay);
                                 printf("Buffered n5 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                n5->time, k, 3, n5->iev.type, 5, n5->iev.code, 5, n5->iev.value,
+                                n5->time, k, 3, n5->iev.type, 5, n5->iev.code, 5, n5->iev.value, 4,
                                 random_delay);
                                 printf("Buffered n6 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
-                                n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value,
+                                n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value, 4,
                                 random_delay);
                                 
                         }
