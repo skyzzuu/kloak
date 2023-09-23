@@ -63,6 +63,7 @@ static struct option long_options[] = {
     {"delay",   1, 0, 'd'},
     {"start",   1, 0, 's'},
     {"keys",    1, 0, 'k'},
+    {"noise",    1, 0, 'n'},
     {"verbose", 0, 0, 'v'},
     {"help",    0, 0, 'h'},
     {0,         0, 0, 0}
@@ -104,8 +105,8 @@ long random_between(long lower, long upper) {
 // from: https://github.com/luileito/mousefaker/blob/main/src/js/mousefaker.js
 int noise(int position) {
         // generate a random number between 0 and 1 for u1 and u2
-        double u1 = (float)randombytes_uniform(999999)/(float)(RAND_MAX/1);
-        double u2 = (float)randombytes_uniform(999999)/(float)(RAND_MAX/1);
+        double u1 = (float)randombytes_uniform(UINT32_MAX)/(float)(UINT32_MAX/1);
+        double u2 = (float)randombytes_uniform(UINT32_MAX)/(float)(UINT32_MAX/1);
         
         double z0 = sqrt(-2.0 * log(u1)) * cos(_2PI * u2);
         
@@ -563,6 +564,15 @@ void main_loop() {
                         // if the times these are given are actually incremental (n2 = n1 + rand, n3 = n2 + rand, etc) it seems to break the cursor movement obfuscation for some reason
                         long random_delay = random_between(lower_bound, max_delay);
                         n2 = malloc(sizeof(struct entry));
+                        n3 = malloc(sizeof(struct entry));
+                        n4 = malloc(sizeof(struct entry));
+                        n5 = malloc(sizeof(struct entry));
+                        n6 = malloc(sizeof(struct entry));
+                        
+                        if(n2 == NULL || n3 == NULL || n4 == NULL || n5 == NULL || n6 == NULL) {
+                            panic("Failed to allocate memory for either n2, n3, n4, n5, or n6");
+                        }
+                        
 
                         n2->time = current_time + (long) random_delay;
                         n2->iev = ev2;
@@ -579,7 +589,7 @@ void main_loop() {
                         
 
                         random_delay = random_between(lower_bound, max_delay);
-                        n3 = malloc(sizeof(struct entry));
+                        
                         n3->time = current_time + (long) random_delay;
                         n3->iev = ev3;
                         n3->device_index = k;
@@ -592,7 +602,7 @@ void main_loop() {
                         TAILQ_INSERT_TAIL(&head, n3, entries);
 
                         random_delay = random_between(lower_bound, max_delay);
-                        n4 = malloc(sizeof(struct entry));
+                        
                         n4->time = current_time + (long) random_delay;
                         n4->iev = ev4;
                         n4->device_index = k;
@@ -605,7 +615,7 @@ void main_loop() {
                         TAILQ_INSERT_TAIL(&head, n4, entries);
 
                         random_delay = random_between(lower_bound, max_delay);
-                        n5 = malloc(sizeof(struct entry));
+                        
                         n5->time = current_time + (long) random_delay;
                         n5->iev = ev5;
                         n5->device_index = k;
@@ -618,7 +628,7 @@ void main_loop() {
                         TAILQ_INSERT_TAIL(&head, n5, entries);
                         
                         random_delay = random_between(lower_bound, max_delay);
-                        n6 = malloc(sizeof(struct entry));
+                        
                         n6->time = current_time + (long) random_delay;
                         n6->iev = ev6;
                         n6->device_index = k;
@@ -750,6 +760,12 @@ int main(int argc, char **argv) {
 
         case 'v':
             verbose = 1;
+            break;
+            
+        case 'n':
+            if((max_noise = atoi(optarg)) < 0) {
+                panic("Maximum noise must be >= 0");
+            }
             break;
 
         case 'h':
