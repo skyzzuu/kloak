@@ -24,8 +24,8 @@
 #define DEFAULT_MAX_NOISE 6          // max number of pixels of adversarial noise added to mouse movements
 #define DEFAULT_STARTUP_DELAY_MS 500 // wait before grabbing the input device
 #define _2PI 6.283185307
-#define rel_mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y)
-#define abs_mouse_move_with_obfuscation ev.type == EV_ABS && max_noise != 0 && ev.value != 0 && (ev.code == ABS_X || ev.code == ABS_Y) && x_axis_maxs[k] != 0 && y_axis_maxs[k] != 0
+#define rel_mouse_move_with_obfuscation ev.type == EV_REL && max_noise != 0 && ev.value != 0 && (ev.code == REL_X || ev.code == REL_Y) && current_left_mouse_button_states[k] != 1 && current_right_mouse_button_states[k] != 1
+#define abs_mouse_move_with_obfuscation ev.type == EV_ABS && max_noise != 0 && ev.value != 0 && (ev.code == ABS_X || ev.code == ABS_Y) && x_axis_maxs[k] != 0 && y_axis_maxs[k] != 0 && current_left_mouse_button_states[k] != 1 && current_right_mouse_button_states[k] != 1
 
 #define panic(format, ...) do { fprintf(stderr, format "\n", ## __VA_ARGS__); fflush(stderr); exit(EXIT_FAILURE); } while (0)
 
@@ -56,10 +56,12 @@ static char named_inputs[MAX_INPUTS][BUFSIZE];
 
 static int input_fds[MAX_INPUTS];
 struct libevdev *output_devs[MAX_INPUTS];
-int x_axis_maxs[MAX_INPUTS] = {0};
-int y_axis_maxs[MAX_INPUTS] = {0};
-int x_axis_mins[MAX_INPUTS] = {0};
-int y_axis_mins[MAX_INPUTS] = {0};
+static int x_axis_maxs[MAX_INPUTS] = {0};
+static int y_axis_maxs[MAX_INPUTS] = {0};
+static int x_axis_mins[MAX_INPUTS] = {0};
+static int y_axis_mins[MAX_INPUTS] = {0};
+static int current_left_mouse_button_states[MAX_INPUTS] = {KEY_UP};
+static int current_right_mouse_button_states[MAX_INPUTS] = {KEY_UP};
 struct libevdev_uinput *uidevs[MAX_INPUTS];
 
 static struct option long_options[] = {
@@ -372,6 +374,12 @@ void main_loop() {
                     random_delay = lower_bound;
                 } else {
                     random_delay = random_between(lower_bound, max_delay);
+                }
+                
+                if(ev.type == EV_KEY && (ev.code == BTN_TOUCH || ev.code == BTN_MOUSE || ev.code == BTN_LEFT)) {
+                    current_left_mouse_button_states[k] = ev.value;
+                } else if(ev.type == EV_KEY && ev.code == BTN_RIGHT) {
+                    current_right_mouse_button_states[k] == ev.value;
                 }
                 
                 if(rel_mouse_move_with_obfuscation) {
