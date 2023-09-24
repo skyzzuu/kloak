@@ -297,8 +297,8 @@ void main_loop() {
     struct entry *n1, *np;
     
     // only used on mouse moves
-    struct input_event ev2, ev3, ev4, ev5, ev6;
-    struct entry *n2 = NULL, *n3 = NULL, *n4 = NULL, *n5 = NULL, *n6 = NULL;
+    struct input_event ev2, ev3, ev4, ev5, ev6, ev7, ev8, ev9, ev10;
+    struct entry *n2 = NULL, *n3 = NULL, *n4 = NULL, *n5 = NULL, *n6 = NULL, *n7 = NULL, *n8 = NULL, *n9 = NULL, *n10 = NULL;
 
 
     // initialize the rescue state
@@ -483,6 +483,20 @@ void main_loop() {
                         ev6.code = 0;
                         ev6.value = 0;
                     }
+                    
+                    // extra events only needed for ABS, but easier to just populate them with syns and send them anyways. Extra syns don't hurt
+                    ev7.type = EV_SYN;
+                    ev7.code = 0;
+                    ev7.value = 0;
+                    ev8.type = EV_SYN;
+                    ev8.code = 0;
+                    ev8.value = 0;
+                    ev9.type = EV_SYN;
+                    ev9.code = 0;
+                    ev9.value = 0;
+                    ev10.type = EV_SYN;
+                    ev10.code = 0;
+                    ev10.value = 0;
                 }
                 
                 // EV_ABS and obfuscation should be applied (only disabled if user explicitly disables, left or right mouse button being held down, or device reported that either ABS_X or ABS_Y are not valid for the device)
@@ -501,113 +515,103 @@ void main_loop() {
                                 
                     } else {
                         
-                        // these are always the same type regardless of whether it's ABS_X or ABS_Y
+                        uint32_t origPos = ev.value;
+                        uint32_t origCode = ev.code;
+                        
+                        // modified ABS_MT_
                         ev.type = EV_ABS;
+                        ev.value = noise(origPos);
+                        
+                        // modified ABS_
                         ev2.type = EV_ABS;
-                        ev3.type = EV_SYN;
+                        ev2.value = noise(origPos);
+                        
+                        // modified perpendicular ABS_MT_
+                        ev3.type = EV_ABS;
+                        
+                        // modified perpendicular ABS_
                         ev4.type = EV_ABS;
-                        ev5.type = EV_ABS;
-                        ev6.type = EV_SYN;
                         
-                        
-                        // ev3 and ev6 are always EV_SYN regardless of ABS_X or ABS_Y
-                        ev3.code = 0;
-                        ev3.value = 0;
-                        ev6.code = 0;
-                        ev6.value = 0;
-                        
-                        if(ev.code == ABS_X) {
-                            // save original value
-                            uint32_t origPos = ev.value; 
-                                        
-                            // modified ABS_X
-                            ev.code = ABS_X;
-                            int newPos = noise(ev.value);
+                        if(origCode == ABS_X) {
+                            ev.code = ABS_MT_POSITION_X;
                             
-                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
-                            if(newPos > x_axis_maxs[k]) {
-                                newPos = x_axis_maxs[k];
-                            } else if(newPos < x_axis_mins[k]) {
-                                newPos = x_axis_mins[k];
-                            }
-                            ev.value = newPos;
-                                        
-                            // modified ABS_Y based on last known position to add noise
-                            ev2.code = ABS_Y;
-                            newPos = noise(abs_last_y);
-
-                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
-                            if(newPos > y_axis_maxs[k]) {
-                                newPos = y_axis_maxs[k];
-                            } else if(newPos < y_axis_mins[k]) {
-                                newPos = y_axis_mins[k];
-                            }
-                            ev2.value = newPos;
-                        
-
-                            // ev3 is EV_SYN
-                        
-                            // move to the target x position
-                            ev4.code = ABS_X;
-                            ev4.value = origPos;
-                        
-                            // move back to the original y position
-                            ev5.code = ABS_Y;
-                            ev5.value = abs_last_y;
-
-                            // ev6 is EV_SYN
-                        
-                            // update last known x position
-                            abs_last_x = origPos;
-                                                
-
-                                        
-                        } else if(ev.code == ABS_Y) {
-                            // save original value
-                            uint32_t origPos = ev.value; 
-                                        
-                            // modified ABS_Y
-                            ev.code = ABS_Y;
-                            int newPos = noise(ev.value);
-                            
-                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
-                            if(newPos > y_axis_maxs[k]) {
-                                newPos = y_axis_maxs[k];
-                            } else if(newPos < y_axis_mins[k]) {
-                                newPos = y_axis_mins[k];
-                            }
-                            ev.value = newPos;
-                        
-                            // modified ABS_X based on last known position to add noise
                             ev2.code = ABS_X;
-                            newPos = noise(abs_last_x);
-
-                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
-                            if(newPos > x_axis_maxs[k]) {
-                                newPos = x_axis_maxs[k];
-                            } else if(newPos < x_axis_mins[k]) {
-                                newPos = x_axis_mins[k];
-                            }
-                            ev2.value = newPos;
-                        
-
-                            // ev3 is EV_SYN
                             
-                            // move to the target x position
+                            ev3.code = ABS_MT_POSITION_Y;
+                            ev3.value = noise(abs_last_y);
+                            
                             ev4.code = ABS_Y;
-                            ev4.value = origPos;
+                            ev4.value = noise(abs_last_y);
+                        } else {
+                            ev.code = ABS_MT_POSITION_Y;
+                            
+                            ev2.code = ABS_Y;
+                            
+                            ev3.code = ABS_MT_POSITION_X;
+                            ev3.value = noise(abs_last_x);
+                            
+                            ev4.code = ABS_X;
+                            ev4.value = noise(abs_last_x);
+                        }
                         
-                            // move back to the original y position
-                            ev5.code = ABS_X;
-                            ev5.value = abs_last_x;
+                        ev5.type = EV_SYN;
+                        ev5.code = 0;
+                        ev5.value = 0;
                         
-
-                            // ev6 is EV_SYN
+                        // move to the target x position
+                        ev6.type = EV_ABS;
+                        ev6.value = origPos;
+                        
+                        // move back to the original y position 
+                        ev7.type = EV_ABS;
+                        ev7.value = origPos;
+                        
+                        ev8.type = EV_ABS;
+                        
+                        ev9.type = EV_ABS;
+                        
+                        if(origCode == ABS_X) {
+                            ev6.code = ABS_MT_POSITION_X;
+                            
+                            ev7.code = ABS_X;
+                            
+                            ev8.code = ABS_MT_POSITION_Y;
+                            
+                            ev9.code = ABS_Y;
+                            
+                            
+                            ev8.value = abs_last_y;
+                            
+                            ev9.value = abs_last_y;
+                            
+                            
+                            abs_last_x = origPos;
+                            
+                        } else {
+                            ev6.code = ABS_MT_POSITION_Y;
+                            
+                            ev7.code = ABS_Y;
+                            
+                            ev8.code = ABS_MT_POSITION_X;
+                            
+                            ev9.code = ABS_X;
+                            
+                            
+                            ev8.value = abs_last_x;
+                            
+                            ev9.value = abs_last_x;
+                            
                             
                             abs_last_y = origPos;
                         }
-                                
+                        
+                        ev10.type = EV_SYN;
+                        ev10.code = 0;
+                        ev10.value = 0;
+                        
                         can_obfuscate = 1;
+                        
+
                     }
                         
                         
@@ -635,9 +639,13 @@ void main_loop() {
                         n4 = malloc(sizeof(struct entry));
                         n5 = malloc(sizeof(struct entry));
                         n6 = malloc(sizeof(struct entry));
+                        n7 = malloc(sizeof(struct entry));
+                        n8 = malloc(sizeof(struct entry));
+                        n9 = malloc(sizeof(struct entry));
+                        n10 = malloc(sizeof(struct entry));
                         
-                        if(n2 == NULL || n3 == NULL || n4 == NULL || n5 == NULL || n6 == NULL) {
-                            panic("Failed to allocate memory for either n2, n3, n4, n5, or n6");
+                        if(n2 == NULL || n3 == NULL || n4 == NULL || n5 == NULL || n6 == NULL || n7 == NULL || n8 == NULL || n9 == NULL || n10 == NULL) {
+                            panic("Failed to allocate memory for either n2, n3, n4, n5, n6, n7, n8, n9, n10");
                         }
                         
 
@@ -666,11 +674,31 @@ void main_loop() {
                         n6->iev = ev6;
                         n6->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n6, entries);
+                        
+                        n7->time = n6->time + (long) random_between(lower_bound, max_delay);
+                        n7->iev = ev7;
+                        n7->device_index = k;
+                        TAILQ_INSERT_TAIL(&head, n7, entries);
+                        
+                        n8->time = n7->time + (long) random_between(lower_bound, max_delay);
+                        n8->iev = ev8;
+                        n8->device_index = k;
+                        TAILQ_INSERT_TAIL(&head, n8, entries);
+                        
+                        n9->time = n8->time + (long) random_between(lower_bound, max_delay);
+                        n9->iev = ev9;
+                        n9->device_index = k;
+                        TAILQ_INSERT_TAIL(&head, n9, entries);
+                        
+                        n10->time = n9->time + (long) random_between(lower_bound, max_delay);
+                        n10->iev = ev10;
+                        n10->device_index = k;
+                        TAILQ_INSERT_TAIL(&head, n10, entries);
                 }
                 
                 // extra events were loaded, change prev_release_time to the release time of n6
                 if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate) ) {
-                        prev_release_time = n6->time;
+                        prev_release_time = n10->time;
                 }
 
                 if (verbose) {
@@ -683,7 +711,7 @@ void main_loop() {
                         }
                         
                         // if extra events were loaded earlier, print them as well
-                        if(((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate)) && n2 && n3 && n4 && n5 && n6 ) {
+                        if(((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate)) && n2 && n3 && n4 && n5 && n6 && n7 && n8 && n9 && n10 ) {
                                 printf("Buffered n2 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
                                 n2->time, k, 3, n2->iev.type, 5, n2->iev.code, 5, n2->iev.value, 4,
@@ -704,7 +732,22 @@ void main_loop() {
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
                                 n6->time, k, 3, n6->iev.type, 5, n6->iev.code, 5, n6->iev.value, 4,
                                 random_delay);
-                                
+                                printf("Buffered n7 event at time: %ld. Device: %d,  Type: %*d,  "
+                                "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
+                                n7->time, k, 3, n7->iev.type, 5, n7->iev.code, 5, n7->iev.value, 4,
+                                random_delay);
+                                printf("Buffered n8 event at time: %ld. Device: %d,  Type: %*d,  "
+                                "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
+                                n8->time, k, 3, n8->iev.type, 5, n8->iev.code, 5, n8->iev.value, 4,
+                                random_delay);
+                                printf("Buffered n9 event at time: %ld. Device: %d,  Type: %*d,  "
+                                "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
+                                n9->time, k, 3, n9->iev.type, 5, n9->iev.code, 5, n9->iev.value, 4,
+                                random_delay);
+                                printf("Buffered n10 event at time: %ld. Device: %d,  Type: %*d,  "
+                                "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
+                                n10->time, k, 3, n10->iev.type, 5, n10->iev.code, 5, n10->iev.value, 4,
+                                random_delay);
                         }
                 }
             }
