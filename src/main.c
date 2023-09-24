@@ -56,12 +56,12 @@ static char named_inputs[MAX_INPUTS][BUFSIZE];
 
 static int input_fds[MAX_INPUTS];
 struct libevdev *output_devs[MAX_INPUTS];
-static int x_axis_maxs[MAX_INPUTS] = {0};
-static int y_axis_maxs[MAX_INPUTS] = {0};
-static int x_axis_mins[MAX_INPUTS] = {0};
-static int y_axis_mins[MAX_INPUTS] = {0};
-static int current_left_mouse_button_states[MAX_INPUTS] = {KEY_UP};
-static int current_right_mouse_button_states[MAX_INPUTS] = {KEY_UP};
+static int x_axis_maxs[MAX_INPUTS] = {0}; // stores the max value for ABS_X returned by libevdev_get_abs_maximum, or 0 if either ABS_X is not valid for the device or it doesn't support EV_ABS and wasn't checked
+static int y_axis_maxs[MAX_INPUTS] = {0}; // stores the max value for ABS_Y returned by libevdev_get_abs_maximum, or 0 if either ABS_Y is not valid for the device or it doesn't support EV_ABS and wasn't checked
+static int x_axis_mins[MAX_INPUTS] = {0}; // stores the min value for ABS_X returned by libevdev_get_abs_minimum, or 0 if either ABS_X is not valid for the device or it doesn't support EV_ABS and wasn't checked
+static int y_axis_mins[MAX_INPUTS] = {0}; // stores the min value for ABS_Y returned by libevdev_get_abs_minimum, or 0 if either ABS_Y is not valid for the device or it doesn't support EV_ABS and wasn't checked
+static int current_left_mouse_button_states[MAX_INPUTS] = {KEY_UP}; // stores current state of the left mouse button (KEY_DOWN or KEY_UP) for devices that support it
+static int current_right_mouse_button_states[MAX_INPUTS] = {KEY_UP}; // stores current state of the right mouse button (KEY_DOWN or KEY_UP) for devices that support it
 struct libevdev_uinput *uidevs[MAX_INPUTS];
 
 static struct option long_options[] = {
@@ -376,25 +376,31 @@ void main_loop() {
                     random_delay = random_between(lower_bound, max_delay);
                 }
                 
+                // if the current event involves the left mouse button
                 if(ev.type == EV_KEY && (ev.code == BTN_TOUCH || ev.code == BTN_MOUSE || ev.code == BTN_LEFT)) {
+                    
+                    // update the state for the current device
                     current_left_mouse_button_states[k] = ev.value;
-                } else if(ev.type == EV_KEY && ev.code == BTN_RIGHT) {
+                } else if(ev.type == EV_KEY && ev.code == BTN_RIGHT) { // if the current event involves the right mouse button
                     current_right_mouse_button_states[k] == ev.value;
                 }
                 
+                // EV_REL event and obfuscation should be applied (only disabled if the user explicitly disabled or one of the mouse buttons is being held down)
                 if(rel_mouse_move_with_obfuscation) {
                     if(ev.code == REL_X) {
 
                         // select a random midpoint to add the perpendicular move
                         int mid_point = random_between(1, abs(ev.value));
-
+                        
                         int final_move = abs(ev.value) - mid_point;
 
+                        // left mouse move, make midpoint and final move negative (to indicate moving to the left)
                         if(ev.value < 0) {
                             mid_point *= -1;
                             final_move *= -1;
                         }
 
+                        // random number of pixels to move along the y axis for adding noise
                         int pixels_y = random_between(1, max_noise);
 
                         // randomly decide whether y move will be up or down
@@ -402,11 +408,12 @@ void main_loop() {
                             pixels_y *= -1;
                         }
 
-
+                        // move to randomly selected midpoint
                         ev.type = EV_REL;
                         ev.code = REL_X;
                         ev.value = mid_point;
 
+                        // perpendicular move for adding noise
                         ev2.type = EV_REL;
                         ev2.code = REL_Y;
                         ev2.value = pixels_y;
@@ -415,10 +422,12 @@ void main_loop() {
                         ev3.code = 0;
                         ev3.value = 0;
 
+                        // opposite of original perpendicular move to move back to the original location
                         ev4.type = EV_REL;
                         ev4.code = REL_Y;
                         ev4.value = pixels_y * -1;
 
+                        // complete the move along the x axis to move to the final location
                         ev5.type = EV_REL;
                         ev5.code = REL_X;
                         ev5.value = final_move;
@@ -446,11 +455,12 @@ void main_loop() {
                         }
 
 
-
+                        // move to randomly selected midpoint
                         ev.type = EV_REL;
                         ev.code = REL_Y;
                         ev.value = mid_point;
 
+                        // perpendicular move for adding noise
                         ev2.type = EV_REL;
                         ev2.code = REL_X;
                         ev2.value = pixels_x;
@@ -459,10 +469,12 @@ void main_loop() {
                         ev3.code = 0;
                         ev3.value = 0;
 
+                        // opposite of original perpendicular move to move back to the original location
                         ev4.type = EV_REL;
                         ev4.code = REL_X;
                         ev4.value = pixels_x * -1;
 
+                        // complete the move along the x axis to move to the final location
                         ev5.type = EV_REL;
                         ev5.code = REL_Y;
                         ev5.value = final_move;
@@ -473,7 +485,7 @@ void main_loop() {
                     }
                 }
                 
-                
+                // EV_ABS and obfuscation should be applied (only disabled if user explicitly disables, left or right mouse button being held down, or device reported that either ABS_X or ABS_Y are not valid for the device)
                 if(abs_mouse_move_with_obfuscation) {
                         
                     // either last known x or y position is not known yet, needed before obfuscation can be added
@@ -488,13 +500,31 @@ void main_loop() {
                                 
                                 
                     } else {
+                        
+                        // these are always the same type regardless of whether it's ABS_X or ABS_Y
+                        ev.type = EV_ABS;
+                        ev2.type = EV_ABS;
+                        ev3.type = EV_SYN;
+                        ev4.type = EV_ABS;
+                        ev5.type = EV_ABS;
+                        ev6.type = EV_SYN;
+                        
+                        
+                        // ev3 and ev6 are always EV_SYN regardless of ABS_X or ABS_Y
+                        ev3.code = 0;
+                        ev3.value = 0;
+                        ev6.code = 0;
+                        ev6.value = 0;
+                        
                         if(ev.code == ABS_X) {
+                            // save original value
                             uint32_t origPos = ev.value; 
                                         
                             // modified ABS_X
-                            ev.type = EV_ABS;
                             ev.code = ABS_X;
                             int newPos = noise(ev.value);
+                            
+                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
                             if(newPos > x_axis_maxs[k]) {
                                 newPos = x_axis_maxs[k];
                             } else if(newPos < x_axis_mins[k]) {
@@ -502,10 +532,11 @@ void main_loop() {
                             }
                             ev.value = newPos;
                                         
-                            // modified ABS_Y based on last known position
-                            ev2.type = EV_ABS;
+                            // modified ABS_Y based on last known position to add noise
                             ev2.code = ABS_Y;
                             newPos = noise(abs_last_y);
+
+                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
                             if(newPos > y_axis_maxs[k]) {
                                 newPos = y_axis_maxs[k];
                             } else if(newPos < y_axis_mins[k]) {
@@ -513,36 +544,33 @@ void main_loop() {
                             }
                             ev2.value = newPos;
                         
-                        
-                            ev3.type = EV_SYN;
-                            ev3.code = 0;
-                            ev3.value = 0;
+
+                            // ev3 is EV_SYN
                         
                             // move to the target x position
-                            ev4.type = EV_ABS;
                             ev4.code = ABS_X;
                             ev4.value = origPos;
                         
                             // move back to the original y position
-                            ev5.type = EV_ABS;
                             ev5.code = ABS_Y;
                             ev5.value = abs_last_y;
+
+                            // ev6 is EV_SYN
                         
-                            ev6.type = EV_SYN;
-                            ev6.code = 0;
-                            ev6.value = 0;
-                        
+                            // update last known x position
                             abs_last_x = origPos;
                                                 
 
                                         
                         } else if(ev.code == ABS_Y) {
+                            // save original value
                             uint32_t origPos = ev.value; 
                                         
                             // modified ABS_Y
-                            ev.type = EV_ABS;
                             ev.code = ABS_Y;
                             int newPos = noise(ev.value);
+                            
+                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
                             if(newPos > y_axis_maxs[k]) {
                                 newPos = y_axis_maxs[k];
                             } else if(newPos < y_axis_mins[k]) {
@@ -550,10 +578,11 @@ void main_loop() {
                             }
                             ev.value = newPos;
                         
-                            // modified ABS_X based on last known position
-                            ev2.type = EV_ABS;
+                            // modified ABS_X based on last known position to add noise
                             ev2.code = ABS_X;
                             newPos = noise(abs_last_x);
+
+                            // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
                             if(newPos > x_axis_maxs[k]) {
                                 newPos = x_axis_maxs[k];
                             } else if(newPos < x_axis_mins[k]) {
@@ -561,27 +590,22 @@ void main_loop() {
                             }
                             ev2.value = newPos;
                         
-                            ev3.type = EV_SYN;
-                            ev3.code = 0;
-                            ev3.value = 0;
-                        
+
+                            // ev3 is EV_SYN
+                            
                             // move to the target x position
-                            ev4.type = EV_ABS;
                             ev4.code = ABS_Y;
                             ev4.value = origPos;
                         
                             // move back to the original y position
-                            ev5.type = EV_ABS;
                             ev5.code = ABS_X;
                             ev5.value = abs_last_x;
                         
-                            ev6.type = EV_SYN;
-                            ev6.code = 0;
-                            ev6.value = 0;
-                        
+
+                            // ev6 is EV_SYN
+                            
                             abs_last_y = origPos;
                         }
-                                
                                 
                         can_obfuscate = 1;
                     }
@@ -604,9 +628,8 @@ void main_loop() {
                 // Keep track of the previous scheduled release time
                 prev_release_time = n1->time;
                 
-                            
+                // EV_REL or EV_ABS and obfuscation can be applied, load the extra events created
                 if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation && can_obfuscate) ) {
-                        long random_delay = random_between(lower_bound, max_delay);
                         n2 = malloc(sizeof(struct entry));
                         n3 = malloc(sizeof(struct entry));
                         n4 = malloc(sizeof(struct entry));
@@ -618,44 +641,34 @@ void main_loop() {
                         }
                         
 
-                        n2->time = n1->time + (long) random_delay;
+                        n2->time = n1->time + (long) random_between(lower_bound, max_delay);
                         n2->iev = ev2;
                         n2->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n2, entries);
                         
 
-                        
-
-                        random_delay = random_between(lower_bound, max_delay);
-                        
-                        n3->time = n2->time + (long) random_delay;
+                        n3->time = n2->time + (long) random_between(lower_bound, max_delay);
                         n3->iev = ev3;
                         n3->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n3, entries);
 
-                        random_delay = random_between(lower_bound, max_delay);
-                        
-                        n4->time = n3->time + (long) random_delay;
+                        n4->time = n3->time + (long) random_between(lower_bound, max_delay);
                         n4->iev = ev4;
                         n4->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n4, entries);
 
-                        random_delay = random_between(lower_bound, max_delay);
-                        
-                        n5->time = n4->time + (long) random_delay;
+                        n5->time = n4->time + (long) random_between(lower_bound, max_delay);
                         n5->iev = ev5;
                         n5->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n5, entries);
                         
-                        random_delay = random_between(lower_bound, max_delay);
-                        
-                        n6->time = n5->time + (long) random_delay;
+                        n6->time = n5->time + (long) random_between(lower_bound, max_delay);
                         n6->iev = ev6;
                         n6->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n6, entries);
                 }
                 
-                // on mouse moves
+                // extra events were loaded, change prev_release_time to the release time of n6
                 if((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate) ) {
                         prev_release_time = n6->time;
                 }
@@ -668,6 +681,8 @@ void main_loop() {
                         if (lower_bound > 0) {
                                 printf("Lower bound raised to: %*ld ms\n", 4, lower_bound);
                         }
+                        
+                        // if extra events were loaded earlier, print them as well
                         if(((rel_mouse_move_with_obfuscation) || (abs_mouse_move_with_obfuscation  && can_obfuscate)) && n2 && n3 && n4 && n5 && n6 ) {
                                 printf("Buffered n2 event at time: %ld. Device: %d,  Type: %*d,  "
                                 "Code: %*d,  Value: %*d,  Scheduled delay: %*ld ms \n",
