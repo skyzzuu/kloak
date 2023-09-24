@@ -60,8 +60,9 @@ static int x_axis_maxs[MAX_INPUTS] = {0}; // stores the max value for ABS_X retu
 static int y_axis_maxs[MAX_INPUTS] = {0}; // stores the max value for ABS_Y returned by libevdev_get_abs_maximum, or 0 if either ABS_Y is not valid for the device or it doesn't support EV_ABS and wasn't checked
 static int x_axis_mins[MAX_INPUTS] = {0}; // stores the min value for ABS_X returned by libevdev_get_abs_minimum, or 0 if either ABS_X is not valid for the device or it doesn't support EV_ABS and wasn't checked
 static int y_axis_mins[MAX_INPUTS] = {0}; // stores the min value for ABS_Y returned by libevdev_get_abs_minimum, or 0 if either ABS_Y is not valid for the device or it doesn't support EV_ABS and wasn't checked
-static int current_left_mouse_button_states[MAX_INPUTS] = {KEY_UP}; // stores current state of the left mouse button (KEY_DOWN or KEY_UP) for devices that support it
-static int current_right_mouse_button_states[MAX_INPUTS] = {KEY_UP}; // stores current state of the right mouse button (KEY_DOWN or KEY_UP) for devices that support it
+static int current_left_mouse_button_states[MAX_INPUTS] = {0}; // stores current state of the left mouse button (KEY_DOWN or KEY_UP) for devices that support it
+static int current_right_mouse_button_states[MAX_INPUTS] = {0}; // stores current state of the right mouse button (KEY_DOWN or KEY_UP) for devices that support it
+static int multi_touch[MAX_INPUTS] = {0};
 struct libevdev_uinput *uidevs[MAX_INPUTS];
 
 static struct option long_options[] = {
@@ -255,6 +256,12 @@ void init_outputs() {
             
             int abs_y_min = libevdev_get_abs_minimum(output_devs[i], ABS_Y);
             y_axis_mins[i] = abs_y_min;
+            
+            // check if device supports multi-touch x and y, need to use a different event order when adding noise to EV_ABS events
+            int mtx = libevdev_has_event_code(output_devs[i], EV_ABS, ABS_MT_POSITION_X);
+            int mty = libevdev_has_event_code(output_devs[i], EV_ABS, ABS_MT_POSITION_Y);
+            
+            multi_touch[i] = mtx && mty;
             
         }
 
@@ -503,6 +510,7 @@ void main_loop() {
                 if(abs_mouse_move_with_obfuscation) {
                         
                     // either last known x or y position is not known yet, needed before obfuscation can be added
+                    // TODO: need to track a different last_x and last_y per device, can't have a universal one (will cause issues if users have multiple devices that send EV_ABS since the reported value is relative to the device's size, not the screen)
                     if(abs_last_x == 0 || abs_last_y == 0) {
                         if(ev.code == ABS_X) {
                             abs_last_x = ev.value;
@@ -515,105 +523,251 @@ void main_loop() {
                                 
                     } else {
                         
-                        uint32_t origPos = ev.value;
-                        uint32_t origCode = ev.code;
+                        if(multi_touch[k]) { // multi-touch (typically the device in the host OS)
+                            
                         
-                        // modified ABS_MT_
-                        ev.type = EV_ABS;
-                        ev.value = noise(origPos);
-                        
-                        // modified ABS_
-                        ev2.type = EV_ABS;
-                        ev2.value = noise(origPos);
-                        
-                        // modified perpendicular ABS_MT_
-                        ev3.type = EV_ABS;
-                        
-                        // modified perpendicular ABS_
-                        ev4.type = EV_ABS;
-                        
-                        if(origCode == ABS_X) {
-                            ev.code = ABS_MT_POSITION_X;
-                            
-                            ev2.code = ABS_X;
-                            
-                            ev3.code = ABS_MT_POSITION_Y;
-                            ev3.value = noise(abs_last_y);
-                            
-                            ev4.code = ABS_Y;
-                            ev4.value = noise(abs_last_y);
-                        } else {
-                            ev.code = ABS_MT_POSITION_Y;
-                            
-                            ev2.code = ABS_Y;
-                            
-                            ev3.code = ABS_MT_POSITION_X;
-                            ev3.value = noise(abs_last_x);
-                            
-                            ev4.code = ABS_X;
-                            ev4.value = noise(abs_last_x);
-                        }
-                        
-                        ev5.type = EV_SYN;
-                        ev5.code = 0;
-                        ev5.value = 0;
-                        
-                        // move to the target x position
-                        ev6.type = EV_ABS;
-                        ev6.value = origPos;
-                        
-                        // move back to the original y position 
-                        ev7.type = EV_ABS;
-                        ev7.value = origPos;
-                        
-                        ev8.type = EV_ABS;
-                        
-                        ev9.type = EV_ABS;
-                        
-                        if(origCode == ABS_X) {
-                            ev6.code = ABS_MT_POSITION_X;
-                            
-                            ev7.code = ABS_X;
-                            
-                            ev8.code = ABS_MT_POSITION_Y;
-                            
-                            ev9.code = ABS_Y;
+                            uint32_t origPos = ev.value;
+                            uint32_t origCode = ev.code;
                             
                             
-                            ev8.value = abs_last_y;
+                            // modified ABS_MT_
+                            ev.type = EV_ABS;
+                            ev.value = noise(origPos);
                             
-                            ev9.value = abs_last_y;
+                            // modified ABS_
+                            ev2.type = EV_ABS;
+                            ev2.value = noise(origPos);
                             
+                            // modified perpendicular ABS_MT_
+                            ev3.type = EV_ABS;
                             
-                            abs_last_x = origPos;
+                            // modified perpendicular ABS_
+                            ev4.type = EV_ABS;
                             
-                        } else {
-                            ev6.code = ABS_MT_POSITION_Y;
+                            if(origCode == ABS_X) {
+                                ev.code = ABS_MT_POSITION_X;
+                                
+                                ev2.code = ABS_X;
+                                
+                                // perpendicular move for adding noise
+                                uint32_t y = noise(abs_last_y);
+                                if(y > y_axis_maxs[k]) {
+                                    y = y_axis_maxs[k];
+                                } else if(y < y_axis_mins[k]) {
+                                    y = y_axis_mins[k];
+                                }
+                                
+                                
+                                ev3.code = ABS_MT_POSITION_Y;
+                                ev3.value = y;
+                                
+                                ev4.code = ABS_Y;
+                                ev4.value = y;
+                            } else {
+                                ev.code = ABS_MT_POSITION_Y;
+                                
+                                ev2.code = ABS_Y;
+                                
+                                // perpendicular move for adding noise
+                                uint32_t x = noise(abs_last_x);
+                                if(x > x_axis_maxs[k]) {
+                                    x = x_axis_maxs[k];
+                                } else if(x < x_axis_mins[k]) {
+                                    x = x_axis_mins[k];
+                                }
+                                
+                                ev3.code = ABS_MT_POSITION_X;
+                                ev3.value = x;
+                                
+                                ev4.code = ABS_X;
+                                ev4.value = x;
+                            }
                             
-                            ev7.code = ABS_Y;
+                            ev5.type = EV_SYN;
+                            ev5.code = 0;
+                            ev5.value = 0;
                             
-                            ev8.code = ABS_MT_POSITION_X;
+                            // move to the target x position
+                            ev6.type = EV_ABS;
+                            ev6.value = origPos;
                             
-                            ev9.code = ABS_X;
+                            // move back to the original y position 
+                            ev7.type = EV_ABS;
+                            ev7.value = origPos;
                             
+                            ev8.type = EV_ABS;
                             
-                            ev8.value = abs_last_x;
+                            ev9.type = EV_ABS;
                             
-                            ev9.value = abs_last_x;
+                            if(origCode == ABS_X) {
+                                ev6.code = ABS_MT_POSITION_X;
+                                
+                                ev7.code = ABS_X;
+                                
+                                ev8.code = ABS_MT_POSITION_Y;
+                                
+                                ev9.code = ABS_Y;
+                                
+                                
+                                ev8.value = abs_last_y;
+                                
+                                ev9.value = abs_last_y;
+                                
+                                
+                                abs_last_x = origPos;
+                                
+                            } else {
+                                ev6.code = ABS_MT_POSITION_Y;
+                                
+                                ev7.code = ABS_Y;
+                                
+                                ev8.code = ABS_MT_POSITION_X;
+                                
+                                ev9.code = ABS_X;
+                                
+                                
+                                ev8.value = abs_last_x;
+                                
+                                ev9.value = abs_last_x;
+                                
+                                
+                                abs_last_y = origPos;
+                            }
                             
+                            ev10.type = EV_SYN;
+                            ev10.code = 0;
+                            ev10.value = 0;
                             
-                            abs_last_y = origPos;
-                        }
-                        
-                        ev10.type = EV_SYN;
-                        ev10.code = 0;
-                        ev10.value = 0;
-                        
-                        can_obfuscate = 1;
-                        
+                            can_obfuscate = 1;
+                            
 
+                        } else { // not multi-touch (typically the device type in the whonix workstation vm)
+                            
+                            // always the same for both ABS_X and ABS_Y
+                            ev.type = EV_ABS;
+                            ev2.type = EV_ABS;
+                            ev3.type = EV_SYN;
+                            ev4.type = EV_ABS;
+                            ev5.type = EV_ABS;
+                            ev6.type = EV_SYN;
+                            ev7.type = EV_SYN;
+                            ev8.type = EV_SYN;
+                            ev9.type = EV_SYN;
+                            ev10.type = EV_SYN;
+                            
+                            // ev3 and ev6 are always EV_SYN for both ABS_X or ABS_Y. 7-10 are filler events here. They're only actually needed for multi-touch devices sending EV_ABS
+                            ev3.code = 0;
+                            ev3.value = 0;
+                            ev6.code = 0;
+                            ev6.value = 0;
+                            ev7.code = 0;
+                            ev7.value = 0;
+                            ev8.code = 0;
+                            ev8.value = 0;
+                            ev9.code = 0;
+                            ev9.value = 0;
+                            ev10.code = 0;
+                            ev10.value = 0;
+                            
+                            if(ev.code == ABS_X) {
+                                // save original value
+                                uint32_t origPos = ev.value; 
+                                            
+                                // modified ABS_X
+                                ev.code = ABS_X;
+                                int newPos = noise(ev.value);
+                                
+                                // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
+                                if(newPos > x_axis_maxs[k]) {
+                                    newPos = x_axis_maxs[k];
+                                } else if(newPos < x_axis_mins[k]) {
+                                    newPos = x_axis_mins[k];
+                                }
+                                ev.value = newPos;
+                                            
+                                // modified ABS_Y based on last known position to add noise
+                                ev2.code = ABS_Y;
+                                newPos = noise(abs_last_y);
+
+                                // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
+                                if(newPos > y_axis_maxs[k]) {
+                                    newPos = y_axis_maxs[k];
+                                } else if(newPos < y_axis_mins[k]) {
+                                    newPos = y_axis_mins[k];
+                                }
+                                ev2.value = newPos;
+                            
+
+                                // ev3 is EV_SYN
+                            
+                                // move to the target x position
+                                ev4.code = ABS_X;
+                                ev4.value = origPos;
+                            
+                                // move back to the original y position
+                                ev5.code = ABS_Y;
+                                ev5.value = abs_last_y;
+
+                                // ev6 is EV_SYN
+                            
+                                // update last known x position
+                                abs_last_x = origPos;
+                                                
+
+                                        
+                            } else if(ev.code == ABS_Y) {
+                                // save original value
+                                uint32_t origPos = ev.value; 
+                                            
+                                // modified ABS_Y
+                                ev.code = ABS_Y;
+                                int newPos = noise(ev.value);
+                                
+                                // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
+                                if(newPos > y_axis_maxs[k]) {
+                                    newPos = y_axis_maxs[k];
+                                } else if(newPos < y_axis_mins[k]) {
+                                    newPos = y_axis_mins[k];
+                                }
+                                ev.value = newPos;
+                            
+                                // modified ABS_X based on last known position to add noise
+                                ev2.code = ABS_X;
+                                newPos = noise(abs_last_x);
+
+                                // ensure that after noise is applied that the new value doesn't go over the axis max or under the axis min as that would be an invalid position
+                                if(newPos > x_axis_maxs[k]) {
+                                    newPos = x_axis_maxs[k];
+                                } else if(newPos < x_axis_mins[k]) {
+                                    newPos = x_axis_mins[k];
+                                }
+                                ev2.value = newPos;
+                            
+
+                                // ev3 is EV_SYN
+                                
+                                // move to the target x position
+                                ev4.code = ABS_Y;
+                                ev4.value = origPos;
+                            
+                                // move back to the original y position
+                                ev5.code = ABS_X;
+                                ev5.value = abs_last_x;
+                            
+
+                                // ev6 is EV_SYN
+                                
+                                abs_last_y = origPos;
+                            }
+                            
+                            
+                            
+                        }
+                    
+                    
+                        can_obfuscate = 1;
                     }
-                        
+                    
                         
                 }
 
@@ -675,22 +829,39 @@ void main_loop() {
                         n6->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n6, entries);
                         
-                        n7->time = n6->time + (long) random_between(lower_bound, max_delay);
+                        // only add delay for 7-10 if multi-touch. For rel and abs that aren't multi-touch, these are filler EV_SYN events
+                        if(multi_touch[k]) {
+                            n7->time = n6->time + (long) random_between(lower_bound, max_delay);
+                        } else {
+                            n7->time = n6->time;
+                        }
                         n7->iev = ev7;
                         n7->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n7, entries);
                         
-                        n8->time = n7->time + (long) random_between(lower_bound, max_delay);
+                        if(multi_touch[k]) {
+                            n8->time = n7->time + (long) random_between(lower_bound, max_delay);
+                        } else {
+                            n8->time = n7->time;
+                        }
                         n8->iev = ev8;
                         n8->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n8, entries);
                         
-                        n9->time = n8->time + (long) random_between(lower_bound, max_delay);
+                        if(multi_touch[k]) {
+                            n9->time = n8->time + (long) random_between(lower_bound, max_delay);
+                        } else {
+                            n9->time = n8->time;
+                        }
                         n9->iev = ev9;
                         n9->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n9, entries);
                         
-                        n10->time = n9->time + (long) random_between(lower_bound, max_delay);
+                        if(multi_touch[k]) {
+                            n10->time = n9->time + (long) random_between(lower_bound, max_delay);
+                        } else {
+                            n10->time = n9->time;
+                        }
                         n10->iev = ev10;
                         n10->device_index = k;
                         TAILQ_INSERT_TAIL(&head, n10, entries);
